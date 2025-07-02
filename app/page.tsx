@@ -424,7 +424,7 @@ export default function PDFExtractorPage() {
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center space-x-2">
             <FileText className="h-8 w-8 text-blue-600" />
-            <h1 className="text-4xl font-bold text-gray-900">PDF Text Extractor</h1>
+            <h1 className="text-4xl font-bold text-gray-900">LDB Document PDF</h1>
           </div>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Upload multiple PDF files and extract their text content with our powerful extraction tool.
@@ -734,7 +734,7 @@ export default function PDFExtractorPage() {
 
         {/* Footer */}
         <div className="text-center text-gray-500 text-sm">
-          <p>Built with FastAPI backend on HuggingFace Space and Next.js frontend on Vercel</p>
+          <p>Part Of Tools Laman Davindo Bahman</p>
           <p className="mt-1">
             API Status:{" "}
             <span
