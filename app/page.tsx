@@ -427,7 +427,7 @@ export default function PDFExtractorPage() {
             <h1 className="text-4xl font-bold text-gray-900">LDB Document PDF</h1>
           </div>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Upload multiple PDF files and extract their text content with our powerful extraction tool.
+            Upload multiple PDF files and use powerful extraction tool.
           </p>
         </div>
 
