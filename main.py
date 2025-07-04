@@ -327,321 +327,391 @@ def extract_notifikasi(text):
         month_name = date_issue_match.group(2)
         year = date_issue_match.group(3)
         
-        month_map = {
+        month_dict = {
             'januari': '01', 'februari': '02', 'maret': '03', 'april': '04',
             'mei': '05', 'juni': '06', 'juli': '07', 'agustus': '08',
             'september': '09', 'oktober': '10', 'november': '11', 'desember': '12'
         }
-        month = month_map.get(month_name.lower(), '01')
-        data["Date Issue"] = f"{day}/{month}/{year}"
-    else:
-        date_issue_match = re.search(
-            r"Pada tanggal\s*:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{4})",
-            text, re.IGNORECASE)
-        if date_issue_match:
-            data["Date Issue"] = format_date(date_issue_match.group(1))
+        month_num = month_dict.get(month_name.lower(), '01')
+        data["Date Issue"] = f"{day}/{month_num}/{year}"
     
-    data["Jenis Dokumen"] = "Notifikasi"
+    data["Jenis Dokumen"] = "NOTIFIKASI"
     return data
 
 def extract_dkptka(text):
-    """Extract DKPTKA document data"""
-    def safe_extract(pattern, text, group=1, flags=re.IGNORECASE):
-        try:
-            match = re.search(pattern, text, flags)
-            if match:
-                result = match.group(group).strip()
-                result = re.sub(r'\s+', ' ', result)
-                return result if result else None
-            return None
-        except Exception:
-            return None
-
-    def clean_extracted_text(text):
-        if not text:
-            return None
-        cleaned = re.sub(r'\s+', ' ', text.strip())
-        cleaned = re.sub(r'["\'\n\r\t]+', ' ', cleaned).strip()
-        return cleaned if cleaned else None
-
-    result = {}
-
-    # Extract company name
-    company_patterns = [
-        r'Nama\s+Pemberi\s+Kerja\s*:\s*([^\n]+)',
-        r'([A-Z][A-Z\s]*PT\.?[A-Z\s]*)\s*(?=\n.*Alamat)',
-    ]
+    data = {
+        "Nomor Keputusan": "",
+        "Nama TKA": "",
+        "Tempat/Tanggal Lahir": "",
+        "Kewarganegaraan": "",
+        "Alamat Tempat Tinggal": "",
+        "Nomor Paspor": "",
+        "Jabatan": "",
+        "Lokasi Kerja": "",
+        "Berlaku": "",
+        "Date Issue": ""
+    }
     
-    company_name = None
-    for pattern in company_patterns:
-        company_name = safe_extract(pattern, text)
-        if company_name:
-            company_name = clean_extracted_text(company_name)
-            break
+    def find(pattern):
+        match = re.search(pattern, text, re.IGNORECASE)
+        return match.group(1).strip() if match else ""
     
-    result["Nama Pemberi Kerja"] = company_name
+    nomor_keputusan_match = re.search(r"NOMOR\s+([A-Z0-9./-]+)", text, re.IGNORECASE)
+    data["Nomor Keputusan"] = nomor_keputusan_match.group(1).strip() if nomor_keputusan_match else ""
+    
+    data["Nama TKA"] = find(r"Nama TKA\s*:\s*(.*)")
+    data["Tempat/Tanggal Lahir"] = find(r"Tempat/Tanggal Lahir\s*:\s*(.*)")
+    data["Kewarganegaraan"] = find(r"Kewarganegaraan\s*:\s*(.*)")
+    data["Alamat Tempat Tinggal"] = find(r"Alamat Tempat Tinggal\s*:\s*(.*)")
+    data["Nomor Paspor"] = find(r"Nomor Paspor\s*:\s*(.*)")
+    data["Jabatan"] = find(r"Jabatan\s*:\s*(.*)")
+    data["Lokasi Kerja"] = find(r"Lokasi Kerja\s*:\s*(.*)")
+    
+    # Extract validity period
+    valid_match = re.search(
+        r"Berlaku\s*:?\s*(\d{2}[-/]\d{2}[-/]\d{4})\s*(?:s\.?d\.?|sampai dengan)?\s*(\d{2}[-/]\d{2}[-/]\d{4})",
+        text, re.IGNORECASE)
+    if not valid_match:
+        valid_match = re.search(
+            r"Tanggal Berlaku\s*:?\s*(\d{2}[-/]\d{2}[-/]\d{4})\s*s\.?d\.?\s*(\d{2}[-/]\d{2}[-/]\d{4})",
+            text, re.IGNORECASE)
+    if valid_match:
+        start_date = format_date(valid_match.group(1))
+        end_date = format_date(valid_match.group(2))
+        data["Berlaku"] = f"{start_date} - {end_date}"
+    
+    # Extract Date Issue with Indonesian month names
+    date_issue_match = re.search(
+        r"Pada tanggal\s*:\s*(\d{1,2})\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+(\d{4})",
+        text, re.IGNORECASE)
+    
+    if date_issue_match:
+        day = date_issue_match.group(1).zfill(2)
+        month_name = date_issue_match.group(2)
+        year = date_issue_match.group(3)
+        
+        month_dict = {
+            'januari': '01', 'februari': '02', 'maret': '03', 'april': '04',
+            'mei': '05', 'juni': '06', 'juli': '07', 'agustus': '08',
+            'september': '09', 'oktober': '10', 'november': '11', 'desember': '12'
+        }
+        month_num = month_dict.get(month_name.lower(), '01')
+        data["Date Issue"] = f"{day}/{month_num}/{year}"
+    
+    data["Jenis Dokumen"] = "DKPTKA"
+    return data
 
-    # Extract address
-    address_patterns = [
-        r'Alamat\s*:\s*(.*?)(?=\n\s*\d+\.\s*Nomor\s+Telepon|\n\s*3\.|$)',
-        r'Alamat\s*:\s*(.*?)(?=Nomor\s+Telepon|Email|$)',
-    ]
-    
-    address = None
-    for pattern in address_patterns:
-        address_match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-        if address_match:
-            address_text = address_match.group(1)
-            address = re.sub(r'\n\s*', ' ', address_text.strip())
-            address = re.sub(r'\s+', ' ', address)
-            break
-    
-    result["Alamat"] = clean_extracted_text(address)
+# ========================= DOCUMENT TYPE DETECTION =========================
 
-    # Extract other fields
-    result["No Telepon"] = safe_extract(r'Nomor\s+Telepon\s*:\s*([0-9\-\+$$$$\s]+)', text)
-    result["Email"] = safe_extract(r'Email\s*:\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', text)
-    result["Nama TKA"] = clean_extracted_text(safe_extract(r'Nama\s+TKA\s*:\s*([^\n]+)', text))
-    result["Tempat/Tanggal Lahir"] = clean_extracted_text(safe_extract(r'Tempat.*?Lahir\s*:\s*([^\n]+)', text))
-    result["Nomor Paspor"] = safe_extract(r'Nomor\s+Paspor\s*:\s*([A-Z0-9]+)', text)
-    result["Kewarganegaraan"] = clean_extracted_text(safe_extract(r'Kewarganegaraan\s*:\s*([^\n]+)', text))
-    result["Jabatan"] = clean_extracted_text(safe_extract(r'Jabatan\s*:\s*([^\n]+)', text))
-    result["Kanim"] = clean_extracted_text(safe_extract(r'Kanim.*?:\s*([^\n]+)', text))
-    result["Lokasi Kerja"] = clean_extracted_text(safe_extract(r'Lokasi\s+Kerja\s*:\s*([^\n]+)', text))
-    
-    # Extract billing code
-    billing_code = None
-    lines = text.splitlines()
-    for i, line in enumerate(lines):
-        if 'Kode Billing Pembayaran' in line:
-            next_lines = lines[i+1:i+4]
-            joined = " ".join(next_lines)
-            match = re.search(r'(\d{12,})', joined)
-            if match:
-                billing_code = match.group(1).strip()
-                break
-    
-    result["Kode Billing Pembayaran"] = billing_code
-    result["DKPTKA"] = clean_extracted_text(safe_extract(r'DKPTKA.*?:\s*(US\$[^\n]+)', text))
-    result["Jenis Dokumen"] = "DKPTKA"
+def detect_document_type(text):
+    # Detection patterns for different document types
+    if re.search(r"SURAT KETERANGAN TENAGA KERJA TERDAFTAR", text, re.IGNORECASE):
+        return "SKTT"
+    elif re.search(r"ENTRY VISA|VISA ENTRY", text, re.IGNORECASE):
+        return "EVLN"
+    elif re.search(r"STAY PERMIT|PERMIT TO STAY|IZIN TINGGAL", text, re.IGNORECASE):
+        return "ITAS"
+    elif re.search(r"IZIN TINGGAL KUNJUNGAN|VISIT PERMIT", text, re.IGNORECASE):
+        return "ITK"
+    elif re.search(r"NOTIFIKASI", text, re.IGNORECASE):
+        return "NOTIFIKASI"
+    elif re.search(r"DKPTKA", text, re.IGNORECASE):
+        return "DKPTKA"
+    else:
+        return "UNKNOWN"
 
-    # Filter out None values
-    filtered_result = {}
-    for key, value in result.items():
-        if value and str(value).strip():
-            filtered_result[key] = value
-        else:
-            filtered_result[key] = None
-
-    return filtered_result
+def extract_data_by_type(text, doc_type):
+    """Extract data based on document type"""
+    if doc_type == "SKTT":
+        return extract_sktt(text)
+    elif doc_type == "EVLN":
+        return extract_evln(text)
+    elif doc_type == "ITAS":
+        return extract_itas(text)
+    elif doc_type == "ITK":
+        return extract_itk(text)
+    elif doc_type == "NOTIFIKASI":
+        return extract_notifikasi(text)
+    elif doc_type == "DKPTKA":
+        return extract_dkptka(text)
+    else:
+        return {"error": f"Unknown document type: {doc_type}"}
 
 # ========================= API ENDPOINTS =========================
 
 @app.get("/")
 async def root():
     return {
-        "message": f"{get_greeting()}, PDF Document Extractor API is running",
-        "timestamp": datetime.now().isoformat(),
-        "supported_documents": ["SKTT", "EVLN", "ITAS", "ITK", "Notifikasi", "DKPTKA"],
-        "endpoints": {
-            "extract": "/extract - POST multiple PDF files with document type",
-            "extract_batch": "/extract-batch - POST for batch processing with Excel export",
-            "extract_with_rename": "/extract-with-rename - POST with file renaming feature",
-            "docs": "/docs - API documentation"
-        }
+        "message": f"{get_greeting()}! Welcome to PDF Document Extractor API",
+        "version": "3.0.0",
+        "supported_documents": ["SKTT", "EVLN", "ITAS", "ITK", "NOTIFIKASI", "DKPTKA"],
+        "description": "API untuk ekstraksi data dari dokumen PDF dan export ke Excel"
     }
-
-@app.options("/extract")
-async def options_extract():
-    return JSONResponse(content={})
 
 @app.post("/extract")
-async def extract_documents(
-    files: List[UploadFile] = File(...),
-    document_type: Optional[str] = Form(None)
+async def extract_single_document(
+    file: UploadFile = File(...),
+    document_type: str = Form(default="auto")
 ):
-    if not files:
-        raise HTTPException(status_code=400, detail="No files provided")
-    
-    if not document_type:
-        document_type = "SKTT"
-    
-    if document_type not in ["SKTT", "EVLN", "ITAS", "ITK", "Notifikasi", "DKPTKA"]:
-        raise HTTPException(status_code=400, detail="Invalid document type")
-    
-    results = []
-    
-    for file in files:
-        if not file.filename.lower().endswith('.pdf'):
-            results.append({
-                "filename": file.filename,
-                "status": "error",
-                "error": "File is not a PDF",
-                "data": None
-            })
-            continue
-        
-        try:
-            await file.seek(0)
-            content = await file.read()
-            
-            with pdfplumber.open(io.BytesIO(content)) as pdf:
-                texts = [page.extract_text() for page in pdf.pages if page.extract_text()]
-                full_text = "\n".join(texts)
-            
-            # Use improved extractors
-            if document_type == "SKTT":
-                extracted_data = extract_sktt(full_text)
-            elif document_type == "EVLN":
-                extracted_data = extract_evln(full_text)
-            elif document_type == "ITAS":
-                extracted_data = extract_itas(full_text)
-            elif document_type == "ITK":
-                extracted_data = extract_itk(full_text)
-            elif document_type == "Notifikasi":
-                extracted_data = extract_notifikasi(full_text)
-            elif document_type == "DKPTKA":
-                extracted_data = extract_dkptka(full_text)
-            else:
-                extracted_data = {}
-            
-            results.append({
-                "filename": file.filename,
-                "status": "success",
-                "data": extracted_data,
-                "document_type": document_type
-            })
-            
-        except Exception as e:
-            error_details = traceback.format_exc()
-            print(f"Error processing {file.filename}: {str(e)}\n{error_details}")
-            results.append({
-                "filename": file.filename,
-                "status": "error",
-                "error": str(e),
-                "data": None
-            })
-    
-    response_data = {
-        "success": True,
-        "timestamp": datetime.now().isoformat(),
-        "document_type": document_type,
-        "total_files": len(files),
-        "processed_files": len([r for r in results if r["status"] == "success"]),
-        "failed_files": len([r for r in results if r["status"] == "error"]),
-        "results": results
-    }
-    
-    return JSONResponse(
-        content=response_data,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type"
-        }
-    )
-
-@app.post("/extract-with-rename")
-async def extract_with_rename(
-    files: List[UploadFile] = File(...),
-    document_type: str = Form(...),
-    use_name_for_rename: bool = Form(True),
-    use_passport_for_rename: bool = Form(True)
-):
-    """Extract data and provide renamed files with ZIP download"""
-    if not files:
-        raise HTTPException(status_code=400, detail="No files provided")
-    
-    if document_type not in ["SKTT", "EVLN", "ITAS", "ITK", "Notifikasi", "DKPTKA"]:
-        raise HTTPException(status_code=400, detail="Invalid document type")
-    
-    all_data = []
-    renamed_files = {}
-    temp_dir = tempfile.mkdtemp()
-    
+    """Extract data from a single PDF document"""
     try:
-        for file in files:
-            if not file.filename.lower().endswith('.pdf'):
-                continue
-            
-            content = await file.read()
-            
-            with pdfplumber.open(io.BytesIO(content)) as pdf:
-                texts = [page.extract_text() for page in pdf.pages if page.extract_text()]
-                full_text = "\n".join(texts)
-            
-            # Extract data
-            if document_type == "SKTT":
-                extracted_data = extract_sktt(full_text)
-            elif document_type == "EVLN":
-                extracted_data = extract_evln(full_text)
-            elif document_type == "ITAS":
-                extracted_data = extract_itas(full_text)
-            elif document_type == "ITK":
-                extracted_data = extract_itk(full_text)
-            elif document_type == "Notifikasi":
-                extracted_data = extract_notifikasi(full_text)
-            elif document_type == "DKPTKA":
-                extracted_data = extract_dkptka(full_text)
-            else:
-                extracted_data = {}
-            
-            all_data.append(extracted_data)
-            
-            # Generate new filename
-            new_filename = generate_new_filename(
-                extracted_data, 
-                use_name_for_rename, 
-                use_passport_for_rename
-            )
-            
-            # Save renamed file
-            temp_file_path = os.path.join(temp_dir, new_filename)
-            with open(temp_file_path, 'wb') as f:
-                f.write(content)
-            
-            renamed_files[file.filename] = {
-                'new_name': new_filename, 
-                'path': temp_file_path
-            }
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="File must be a PDF")
         
-        # Create Excel file
-        df = pd.DataFrame(all_data)
-        excel_path = os.path.join(temp_dir, f"Hasil_Ekstraksi_{document_type}.xlsx")
-        df.to_excel(excel_path, index=False)
+        # Read PDF content
+        content = await file.read()
         
-        # Create ZIP file with renamed PDFs
-        zip_path = os.path.join(temp_dir, "Renamed_Files.zip")
-        with zipfile.ZipFile(zip_path, 'w') as zipf:
-            for file_info in renamed_files.values():
-                zipf.write(file_info['path'], arcname=file_info['new_name'])
+        # Extract text from PDF
+        with io.BytesIO(content) as pdf_file:
+            with pdfplumber.open(pdf_file) as pdf:
+                text = ""
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+        
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="No text found in PDF")
+        
+        # Detect document type if auto
+        if document_type.lower() == "auto":
+            document_type = detect_document_type(text)
+        
+        # Extract data
+        extracted_data = extract_data_by_type(text, document_type.upper())
         
         return {
-            "success": True,
-            "timestamp": datetime.now().isoformat(),
-            "document_type": document_type,
-            "total_files": len(files),
-            "processed_files": len(all_data),
-            "extraction_data": all_data,
-            "renamed_files": {k: v['new_name'] for k, v in renamed_files.items()},
-            "download_links": {
-                "excel": f"/download-excel/{os.path.basename(excel_path)}",
-                "zip": f"/download-zip/{os.path.basename(zip_path)}"
-            }
+            "status": "success",
+            "filename": file.filename,
+            "document_type": document_type.upper(),
+            "extracted_data": extracted_data
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing files: {str(e)}")
-    finally:
-        # Cleanup will be handled by the download endpoints
-        pass
+        return {
+            "status": "error",
+            "filename": file.filename,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+@app.post("/extract-bulk")
+async def extract_bulk_documents(
+    files: List[UploadFile] = File(...),
+    document_type: str = Form(default="auto"),
+    export_format: str = Form(default="excel")
+):
+    """Extract data from multiple PDF documents and export to Excel"""
+    try:
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        all_results = []
+        
+        for file in files:
+            try:
+                # Validate file type
+                if not file.filename.lower().endswith('.pdf'):
+                    all_results.append({
+                        "filename": file.filename,
+                        "status": "error",
+                        "error": "File must be a PDF"
+                    })
+                    continue
+                
+                # Read PDF content
+                content = await file.read()
+                
+                # Extract text from PDF
+                with io.BytesIO(content) as pdf_file:
+                    with pdfplumber.open(pdf_file) as pdf:
+                        text = ""
+                        for page in pdf.pages:
+                            page_text = page.extract_text()
+                            if page_text:
+                                text += page_text + "\n"
+                
+                if not text.strip():
+                    all_results.append({
+                        "filename": file.filename,
+                        "status": "error",
+                        "error": "No text found in PDF"
+                    })
+                    continue
+                
+                # Detect document type if auto
+                current_doc_type = document_type
+                if document_type.lower() == "auto":
+                    current_doc_type = detect_document_type(text)
+                
+                # Extract data
+                extracted_data = extract_data_by_type(text, current_doc_type.upper())
+                
+                # Add filename to extracted data
+                extracted_data["Original_Filename"] = file.filename
+                
+                all_results.append({
+                    "filename": file.filename,
+                    "status": "success",
+                    "document_type": current_doc_type.upper(),
+                    "extracted_data": extracted_data
+                })
+                
+            except Exception as e:
+                all_results.append({
+                    "filename": file.filename,
+                    "status": "error",
+                    "error": str(e)
+                })
+        
+        # Create Excel file with results
+        successful_extractions = [r for r in all_results if r["status"] == "success"]
+        
+        if not successful_extractions:
+            raise HTTPException(status_code=400, detail="No successful extractions found")
+        
+        # Prepare data for Excel
+        excel_data = []
+        for result in successful_extractions:
+            excel_data.append(result["extracted_data"])
+        
+        # Create DataFrame and save to Excel
+        df = pd.DataFrame(excel_data)
+        
+        # Create temporary Excel file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+            df.to_excel(tmp_file.name, index=False, engine='openpyxl')
+            excel_path = tmp_file.name
+        
+        # Generate filename for download
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"extracted_data_{timestamp}.xlsx"
+        
+        return FileResponse(
+            excel_path,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename=download_filename,
+            headers={"Content-Disposition": f"attachment; filename={download_filename}"}
+        )
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+@app.post("/extract-and-rename")
+async def extract_and_rename_documents(
+    files: List[UploadFile] = File(...),
+    document_type: str = Form(default="auto"),
+    use_name: bool = Form(default=True),
+    use_passport: bool = Form(default=True)
+):
+    """Extract data from PDFs and return renamed files with extracted data in Excel"""
+    try:
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        # Create temporary directory for processing
+        with tempfile.TemporaryDirectory() as temp_dir:
+            extracted_data_list = []
+            renamed_files = []
+            
+            for file in files:
+                try:
+                    # Validate file type
+                    if not file.filename.lower().endswith('.pdf'):
+                        continue
+                    
+                    # Read PDF content
+                    content = await file.read()
+                    
+                    # Extract text from PDF
+                    with io.BytesIO(content) as pdf_file:
+                        with pdfplumber.open(pdf_file) as pdf:
+                            text = ""
+                            for page in pdf.pages:
+                                page_text = page.extract_text()
+                                if page_text:
+                                    text += page_text + "\n"
+                    
+                    if not text.strip():
+                        continue
+                    
+                    # Detect document type if auto
+                    current_doc_type = document_type
+                    if document_type.lower() == "auto":
+                        current_doc_type = detect_document_type(text)
+                    
+                    # Extract data
+                    extracted_data = extract_data_by_type(text, current_doc_type.upper())
+                    
+                    # Generate new filename
+                    new_filename = generate_new_filename(
+                        extracted_data, 
+                        use_name=use_name, 
+                        use_passport=use_passport
+                    )
+                    
+                    # Save renamed PDF
+                    renamed_path = os.path.join(temp_dir, new_filename)
+                    with open(renamed_path, 'wb') as f:
+                        f.write(content)
+                    
+                    # Add to extracted data list
+                    extracted_data["Original_Filename"] = file.filename
+                    extracted_data["New_Filename"] = new_filename
+                    extracted_data_list.append(extracted_data)
+                    renamed_files.append(renamed_path)
+                    
+                except Exception as e:
+                    continue
+            
+            if not extracted_data_list:
+                raise HTTPException(status_code=400, detail="No files could be processed")
+            
+            # Create Excel file with extracted data
+            df = pd.DataFrame(extracted_data_list)
+            excel_path = os.path.join(temp_dir, "extracted_data.xlsx")
+            df.to_excel(excel_path, index=False, engine='openpyxl')
+            
+            # Create ZIP file with renamed PDFs and Excel data
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            zip_filename = f"renamed_documents_{timestamp}.zip"
+            zip_path = os.path.join(temp_dir, zip_filename)
+            
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Add renamed PDFs
+                for file_path in renamed_files:
+                    zipf.write(file_path, os.path.basename(file_path))
+                
+                # Add Excel file
+                zipf.write(excel_path, "extracted_data.xlsx")
+            
+            # Return ZIP file
+            return FileResponse(
+                zip_path,
+                media_type="application/zip",
+                filename=zip_filename,
+                headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
+            )
+            
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
 
 @app.get("/health")
 async def health_check():
+    """Health check endpoint"""
     return {
-        "status": "healthy", 
+        "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "service": "PDF Document Extractor API"
+        "version": "3.0.0"
     }
 
 @app.get("/document-types")
